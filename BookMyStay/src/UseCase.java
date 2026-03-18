@@ -6,63 +6,78 @@ import java.util.*;
 public class UseCase {
 
     // =========================
-    // RESERVATION CLASS
+    // INVENTORY CLASS
     // =========================
-    static class Reservation {
-        private String guestName;
-        private String roomType;
+    static class RoomInventory {
+        private Map<String, Integer> availability;
 
-        public Reservation(String guestName, String roomType) {
-            this.guestName = guestName;
-            this.roomType = roomType;
+        public RoomInventory() {
+            availability = new HashMap<>();
+            availability.put("Single", 5);
+            availability.put("Double", 3);
         }
 
-        public String getGuestName() {
-            return guestName;
+        public void increaseAvailability(String type) {
+            availability.put(type, availability.getOrDefault(type, 0) + 1);
         }
 
-        public String getRoomType() {
-            return roomType;
+        public int getAvailability(String type) {
+            return availability.getOrDefault(type, 0);
         }
     }
 
     // =========================
-    // BOOKING HISTORY CLASS
+    // CANCELLATION SERVICE
     // =========================
-    static class BookingHistory {
+    static class CancellationService {
 
-        // List to store confirmed reservations
-        private List<Reservation> confirmedReservations;
+        // Stack for rollback tracking
+        private Stack<String> releasedRoomIds;
 
-        public BookingHistory() {
-            confirmedReservations = new ArrayList<>();
+        // Map: reservationID → roomType
+        private Map<String, String> reservationMap;
+
+        public CancellationService() {
+            releasedRoomIds = new Stack<>();
+            reservationMap = new HashMap<>();
         }
 
-        // Add reservation to history
-        public void addReservation(Reservation reservation) {
-            confirmedReservations.add(reservation);
+        // Register confirmed booking
+        public void registerBooking(String reservationId, String roomType) {
+            reservationMap.put(reservationId, roomType);
         }
 
-        // Retrieve all reservations
-        public List<Reservation> getConfirmedReservations() {
-            return confirmedReservations;
+        // Cancel booking
+        public void cancelBooking(String reservationId, RoomInventory inventory) {
+
+            if (!reservationMap.containsKey(reservationId)) {
+                System.out.println("Invalid cancellation: Reservation not found.");
+                return;
+            }
+
+            String roomType = reservationMap.get(reservationId);
+
+            // Restore inventory
+            inventory.increaseAvailability(roomType);
+
+            // Track rollback using stack
+            releasedRoomIds.push(reservationId);
+
+            // Remove from active bookings
+            reservationMap.remove(reservationId);
+
+            System.out.println("Booking cancelled successfully. Inventory restored for room type: " + roomType);
         }
-    }
 
-    // =========================
-    // REPORT SERVICE CLASS
-    // =========================
-    static class BookingReportService {
+        // Display rollback history (LIFO)
+        public void showRollbackHistory() {
 
-        public void generateReport(BookingHistory history) {
+            System.out.println("\nRollback History (Most Recent First):");
 
-            System.out.println("Booking History Report\n");
+            Stack<String> tempStack = (Stack<String>) releasedRoomIds.clone();
 
-            List<Reservation> reservations = history.getConfirmedReservations();
-
-            for (Reservation r : reservations) {
-                System.out.println("Guest: " + r.getGuestName() +
-                        ", Room Type: " + r.getRoomType());
+            while (!tempStack.isEmpty()) {
+                System.out.println("Released Reservation ID: " + tempStack.pop());
             }
         }
     }
@@ -72,15 +87,21 @@ public class UseCase {
     // =========================
     public static void main(String[] args) {
 
-        BookingHistory history = new BookingHistory();
-        BookingReportService reportService = new BookingReportService();
+        RoomInventory inventory = new RoomInventory();
+        CancellationService service = new CancellationService();
 
         // Simulate confirmed bookings
-        history.addReservation(new Reservation("Abhi", "Single"));
-        history.addReservation(new Reservation("Suba", "Double"));
-        history.addReservation(new Reservation("Varnith", "Suite"));
+        service.registerBooking("Single-1", "Single");
+        service.registerBooking("Double-1", "Double");
 
-        // Generate report
-        reportService.generateReport(history);
+        // Cancel one booking
+        service.cancelBooking("Single-1", inventory);
+
+        // Show rollback history
+        service.showRollbackHistory();
+
+        // Show updated inventory
+        System.out.println("\nUpdated Single Room Availability: " +
+                inventory.getAvailability("Single"));
     }
 }

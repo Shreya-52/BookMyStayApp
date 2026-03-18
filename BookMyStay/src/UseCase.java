@@ -6,15 +6,6 @@ import java.util.*;
 public class UseCase {
 
     // =========================
-    // CUSTOM EXCEPTION
-    // =========================
-    static class InvalidBookingException extends Exception {
-        public InvalidBookingException(String message) {
-            super(message);
-        }
-    }
-
-    // =========================
     // INVENTORY CLASS
     // =========================
     static class RoomInventory {
@@ -22,46 +13,71 @@ public class UseCase {
 
         public RoomInventory() {
             availability = new HashMap<>();
-            availability.put("Single", 2);
-            availability.put("Double", 1);
-            availability.put("Suite", 0); // intentionally 0 for testing
+            availability.put("Single", 5);
+            availability.put("Double", 3);
+        }
+
+        public void increaseAvailability(String type) {
+            availability.put(type, availability.getOrDefault(type, 0) + 1);
         }
 
         public int getAvailability(String type) {
-            return availability.getOrDefault(type, -1);
+            return availability.getOrDefault(type, 0);
         }
     }
 
     // =========================
-    // VALIDATOR CLASS
+    // CANCELLATION SERVICE
     // =========================
-    static class ReservationValidator {
+    static class CancellationService {
 
-        public static void validate(String guestName,
-                                    String roomType,
-                                    RoomInventory inventory)
-                throws InvalidBookingException {
+        // Stack for rollback tracking
+        private Stack<String> releasedRoomIds;
 
-            // Validate guest name
-            if (guestName == null || guestName.trim().isEmpty()) {
-                throw new InvalidBookingException("Guest name cannot be empty");
+        // Map: reservationID → roomType
+        private Map<String, String> reservationMap;
+
+        public CancellationService() {
+            releasedRoomIds = new Stack<>();
+            reservationMap = new HashMap<>();
+        }
+
+        // Register confirmed booking
+        public void registerBooking(String reservationId, String roomType) {
+            reservationMap.put(reservationId, roomType);
+        }
+
+        // Cancel booking
+        public void cancelBooking(String reservationId, RoomInventory inventory) {
+
+            if (!reservationMap.containsKey(reservationId)) {
+                System.out.println("Invalid cancellation: Reservation not found.");
+                return;
             }
 
-            // Validate room type
-            if (roomType == null || roomType.trim().isEmpty()) {
-                throw new InvalidBookingException("Room type cannot be empty");
-            }
+            String roomType = reservationMap.get(reservationId);
 
-            // Check if room type exists
-            int available = inventory.getAvailability(roomType);
+            // Restore inventory
+            inventory.increaseAvailability(roomType);
 
-            if (available == -1) {
-                throw new InvalidBookingException("Invalid room type selected");
-            }
+            // Track rollback using stack
+            releasedRoomIds.push(reservationId);
 
-            // Check availability
-            if (available <= 0) {
-                throw new InvalidBookingException("No rooms available for " + roomType);
+            // Remove from active bookings
+            reservationMap.remove(reservationId);
+
+            System.out.println("Booking cancelled successfully. Inventory restored for room type: " + roomType);
+        }
+
+        // Display rollback history (LIFO)
+        public void showRollbackHistory() {
+
+            System.out.println("\nRollback History (Most Recent First):");
+
+            Stack<String> tempStack = (Stack<String>) releasedRoomIds.clone();
+
+            while (!tempStack.isEmpty()) {
+                System.out.println("Released Reservation ID: " + tempStack.pop());
             }
         }
     }
@@ -72,26 +88,20 @@ public class UseCase {
     public static void main(String[] args) {
 
         RoomInventory inventory = new RoomInventory();
+        CancellationService service = new CancellationService();
 
-        // Test cases
-        String guestName = "Abhi";
-        String roomType = "Suite"; // intentionally unavailable
+        // Simulate confirmed bookings
+        service.registerBooking("Single-1", "Single");
+        service.registerBooking("Double-1", "Double");
 
-        try {
-            ReservationValidator.validate(guestName, roomType, inventory);
+        // Cancel one booking
+        service.cancelBooking("Single-1", inventory);
 
-            System.out.println("Booking is valid. Proceeding with reservation...");
+        // Show rollback history
+        service.showRollbackHistory();
 
-        } catch (InvalidBookingException e) {
-            System.out.println("Booking failed: " + e.getMessage());
-        }
-
-        // Another test (invalid input)
-        try {
-            ReservationValidator.validate("", "Single", inventory);
-
-        } catch (InvalidBookingException e) {
-            System.out.println("Booking failed: " + e.getMessage());
-        }
+        // Show updated inventory
+        System.out.println("\nUpdated Single Room Availability: " +
+                inventory.getAvailability("Single"));
     }
 }

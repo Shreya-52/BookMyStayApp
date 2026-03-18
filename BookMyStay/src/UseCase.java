@@ -6,70 +6,62 @@ import java.util.*;
 public class UseCase {
 
     // =========================
-    // INVENTORY CLASS
+    // ADD-ON SERVICE CLASS
     // =========================
-    static class RoomInventory {
-        private Map<String, Integer> availability;
+    static class AddOnService {
+        private String serviceName;
+        private double cost;
 
-        public RoomInventory() {
-            availability = new HashMap<>();
-            availability.put("Single", 2);
-            availability.put("Double", 1);
+        public AddOnService(String serviceName, double cost) {
+            this.serviceName = serviceName;
+            this.cost = cost;
         }
 
-        public synchronized boolean reduceAvailability(String type) {
-            int count = availability.getOrDefault(type, 0);
+        public String getServiceName() {
+            return serviceName;
+        }
 
-            if (count > 0) {
-                availability.put(type, count - 1);
-                return true;
-            }
-            return false;
+        public double getCost() {
+            return cost;
         }
     }
 
     // =========================
-    // ROOM ALLOCATION SERVICE
+    // ADD-ON SERVICE MANAGER
     // =========================
-    static class RoomAllocationService {
+    static class AddOnServiceManager {
 
-        // Tracks assigned rooms (to avoid duplicates)
-        private Set<String> allocatedRooms = new HashSet<>();
+        // Map: reservationID → list of services
+        private Map<String, List<AddOnService>> serviceMapping;
 
-        // Track room count per type
-        private Map<String, Integer> roomCounters = new HashMap<>();
-
-        public RoomAllocationService() {
-            roomCounters.put("Single", 1);
-            roomCounters.put("Double", 1);
+        public AddOnServiceManager() {
+            serviceMapping = new HashMap<>();
         }
 
-        // Allocate unique room number
-        public synchronized String allocateRoom(String type, RoomInventory inventory) {
+        // Add service to reservation
+        public void addService(String reservationId, AddOnService service) {
 
-            // Step 1: check availability
-            if (!inventory.reduceAvailability(type)) {
-                return null;
-            }
+            serviceMapping.putIfAbsent(reservationId, new ArrayList<>());
 
-            // Step 2: generate unique room number
-            String roomNumber = generateRoomNumber(type);
+            serviceMapping.get(reservationId).add(service);
 
-            // Step 3: ensure uniqueness
-            while (allocatedRooms.contains(roomNumber)) {
-                roomNumber = generateRoomNumber(type);
-            }
-
-            allocatedRooms.add(roomNumber);
-
-            return roomNumber;
+            System.out.println(service.getServiceName() + " added to " + reservationId);
         }
 
-        private String generateRoomNumber(String type) {
-            int count = roomCounters.get(type);
-            roomCounters.put(type, count + 1);
+        // Calculate total add-on cost
+        public double calculateTotalServiceCost(String reservationId) {
 
-            return type.substring(0, 1) + "-Room-" + count;
+            double total = 0;
+
+            List<AddOnService> services = serviceMapping.get(reservationId);
+
+            if (services != null) {
+                for (AddOnService s : services) {
+                    total += s.getCost();
+                }
+            }
+
+            return total;
         }
     }
 
@@ -78,33 +70,24 @@ public class UseCase {
     // =========================
     public static void main(String[] args) {
 
-        RoomInventory inventory = new RoomInventory();
-        RoomAllocationService allocationService = new RoomAllocationService();
+        AddOnServiceManager manager = new AddOnServiceManager();
 
-        System.out.println("Allocation Processing...\n");
+        String reservationId = "RES-101";
 
-        // Simulate multiple booking requests
-        processBooking("Single", allocationService, inventory);
-        processBooking("Single", allocationService, inventory);
-        processBooking("Single", allocationService, inventory); // should fail
+        // Create services
+        AddOnService breakfast = new AddOnService("Breakfast", 500);
+        AddOnService spa = new AddOnService("Spa", 1000);
 
-        processBooking("Double", allocationService, inventory);
-        processBooking("Double", allocationService, inventory); // should fail
-    }
+        System.out.println("Add-On Service Selection\n");
 
-    // =========================
-    // BOOKING FLOW
-    // =========================
-    public static void processBooking(String type,
-                                      RoomAllocationService service,
-                                      RoomInventory inventory) {
+        // Add services
+        manager.addService(reservationId, breakfast);
+        manager.addService(reservationId, spa);
 
-        String room = service.allocateRoom(type, inventory);
+        // Calculate total
+        double totalCost = manager.calculateTotalServiceCost(reservationId);
 
-        if (room != null) {
-            System.out.println("Booking confirmed for " + type + ". Room ID: " + room);
-        } else {
-            System.out.println("Booking failed for " + type + " (No rooms available)");
-        }
+        System.out.println("\nReservation ID: " + reservationId);
+        System.out.println("Total Add-On Cost: " + totalCost);
     }
 }

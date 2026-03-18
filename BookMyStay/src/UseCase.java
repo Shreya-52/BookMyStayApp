@@ -6,63 +6,62 @@ import java.util.*;
 public class UseCase {
 
     // =========================
-    // RESERVATION CLASS
+    // CUSTOM EXCEPTION
     // =========================
-    static class Reservation {
-        private String guestName;
-        private String roomType;
-
-        public Reservation(String guestName, String roomType) {
-            this.guestName = guestName;
-            this.roomType = roomType;
-        }
-
-        public String getGuestName() {
-            return guestName;
-        }
-
-        public String getRoomType() {
-            return roomType;
+    static class InvalidBookingException extends Exception {
+        public InvalidBookingException(String message) {
+            super(message);
         }
     }
 
     // =========================
-    // BOOKING HISTORY CLASS
+    // INVENTORY CLASS
     // =========================
-    static class BookingHistory {
+    static class RoomInventory {
+        private Map<String, Integer> availability;
 
-        // List to store confirmed reservations
-        private List<Reservation> confirmedReservations;
-
-        public BookingHistory() {
-            confirmedReservations = new ArrayList<>();
+        public RoomInventory() {
+            availability = new HashMap<>();
+            availability.put("Single", 2);
+            availability.put("Double", 1);
+            availability.put("Suite", 0); // intentionally 0 for testing
         }
 
-        // Add reservation to history
-        public void addReservation(Reservation reservation) {
-            confirmedReservations.add(reservation);
-        }
-
-        // Retrieve all reservations
-        public List<Reservation> getConfirmedReservations() {
-            return confirmedReservations;
+        public int getAvailability(String type) {
+            return availability.getOrDefault(type, -1);
         }
     }
 
     // =========================
-    // REPORT SERVICE CLASS
+    // VALIDATOR CLASS
     // =========================
-    static class BookingReportService {
+    static class ReservationValidator {
 
-        public void generateReport(BookingHistory history) {
+        public static void validate(String guestName,
+                                    String roomType,
+                                    RoomInventory inventory)
+                throws InvalidBookingException {
 
-            System.out.println("Booking History Report\n");
+            // Validate guest name
+            if (guestName == null || guestName.trim().isEmpty()) {
+                throw new InvalidBookingException("Guest name cannot be empty");
+            }
 
-            List<Reservation> reservations = history.getConfirmedReservations();
+            // Validate room type
+            if (roomType == null || roomType.trim().isEmpty()) {
+                throw new InvalidBookingException("Room type cannot be empty");
+            }
 
-            for (Reservation r : reservations) {
-                System.out.println("Guest: " + r.getGuestName() +
-                        ", Room Type: " + r.getRoomType());
+            // Check if room type exists
+            int available = inventory.getAvailability(roomType);
+
+            if (available == -1) {
+                throw new InvalidBookingException("Invalid room type selected");
+            }
+
+            // Check availability
+            if (available <= 0) {
+                throw new InvalidBookingException("No rooms available for " + roomType);
             }
         }
     }
@@ -72,15 +71,27 @@ public class UseCase {
     // =========================
     public static void main(String[] args) {
 
-        BookingHistory history = new BookingHistory();
-        BookingReportService reportService = new BookingReportService();
+        RoomInventory inventory = new RoomInventory();
 
-        // Simulate confirmed bookings
-        history.addReservation(new Reservation("Abhi", "Single"));
-        history.addReservation(new Reservation("Suba", "Double"));
-        history.addReservation(new Reservation("Varnith", "Suite"));
+        // Test cases
+        String guestName = "Abhi";
+        String roomType = "Suite"; // intentionally unavailable
 
-        // Generate report
-        reportService.generateReport(history);
+        try {
+            ReservationValidator.validate(guestName, roomType, inventory);
+
+            System.out.println("Booking is valid. Proceeding with reservation...");
+
+        } catch (InvalidBookingException e) {
+            System.out.println("Booking failed: " + e.getMessage());
+        }
+
+        // Another test (invalid input)
+        try {
+            ReservationValidator.validate("", "Single", inventory);
+
+        } catch (InvalidBookingException e) {
+            System.out.println("Booking failed: " + e.getMessage());
+        }
     }
 }
